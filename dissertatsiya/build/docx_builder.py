@@ -30,7 +30,7 @@ def png_size(path):
     return w, h
 
 
-def runs_from_markup(text, base_size=None):
+def runs_from_markup(text, base_size=None, base_bold=False, base_color=None):
     """Inline markupni run XML ro'yxatiga aylantiradi.
     **qalin** segment ichida ham ~pastki~ / ^yuqori^ indeks ishlaydi."""
     out = []
@@ -38,13 +38,15 @@ def runs_from_markup(text, base_size=None):
         if part == '':
             continue
         if part.startswith('**') and part.endswith('**') and len(part) >= 4:
-            out.append(_sub_sup_runs(part[2:-2], bold=True, base_size=base_size))
+            out.append(_sub_sup_runs(part[2:-2], bold=True, base_size=base_size,
+                                     base_color=base_color))
         else:
-            out.append(_sub_sup_runs(part, bold=False, base_size=base_size))
+            out.append(_sub_sup_runs(part, bold=base_bold, base_size=base_size,
+                                     base_color=base_color))
     return ''.join(out)
 
 
-def _sub_sup_runs(text, bold=False, base_size=None):
+def _sub_sup_runs(text, bold=False, base_size=None, base_color=None):
     tokens = re.findall(r'(~[^~]*~|\^[^\^]*\^|[^~^]+)', text)
     out = []
     for tk in tokens:
@@ -61,6 +63,8 @@ def _sub_sup_runs(text, bold=False, base_size=None):
         rpr = []
         if bold:
             rpr.append('<w:b/>')
+        if base_color:
+            rpr.append('<w:color w:val="%s"/>' % base_color)
         if sub:
             rpr.append('<w:vertAlign w:val="subscript"/>')
         if sup:
@@ -108,22 +112,12 @@ class Document:
         )
 
     def add_centered(self, text, bold=False, size=None, color=None, before=0, after=0):
-        space_before = before
-        space_after = after
-        rpr = []
-        if bold:
-            rpr.append('<w:b/>')
-        if size:
-            rpr.append('<w:sz w:val="%d"/><w:szCs w:val="%d"/>' % (size, size))
-        if color:
-            rpr.append('<w:color w:val="%s"/>' % color)
-        rprx = '<w:rPr>%s</w:rPr>' % ''.join(rpr) if rpr else ''
+        runs = runs_from_markup(text, base_size=size, base_bold=bold, base_color=color)
         self.blocks.append(
             '<w:p><w:pPr><w:jc w:val="center"/>'
             '<w:spacing w:before="%d" w:after="%d"/>'
-            '<w:ind w:firstLine="0"/></w:pPr>'
-            '<w:r>%s<w:t xml:space="preserve">%s</w:t></w:r></w:p>'
-            % (space_before, space_after, rprx, esc(text))
+            '<w:ind w:firstLine="0"/></w:pPr>%s</w:p>'
+            % (before, after, runs)
         )
 
     def add_spacer(self, count=1):
