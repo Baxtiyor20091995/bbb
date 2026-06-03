@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HT-250 — Operator paneli (HMI)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    background: #1b2330; color: #e8edf4; padding: 14px;
+    user-select: none;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    background: linear-gradient(90deg,#243044,#2d3b54);
+    border: 1px solid #3a4a66; border-radius: 10px;
+    padding: 10px 18px; margin-bottom: 12px;
+  }
+  .topbar h1 { font-size: 19px; letter-spacing: .5px; }
+  .topbar .sub { font-size: 12px; color: #8fa3bf; }
+  .clock { font-variant-numeric: tabular-nums; font-size: 14px; color:#bcd; }
+  .grid { display: grid; grid-template-columns: 1.45fr 1fr; gap: 12px; }
+  .panel {
+    background: #222c3c; border: 1px solid #3a4a66;
+    border-radius: 10px; padding: 14px;
+  }
+  .panel h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
+    color: #7fd1c0; margin-bottom: 10px; border-bottom: 1px solid #344;
+    padding-bottom: 6px;
+  }
+  svg { width: 100%; height: auto; background:#11161f; border-radius:8px; }
+  .ctrl-row { display:flex; align-items:center; gap:10px; margin:9px 0; }
+  .ctrl-row label { width: 150px; font-size: 13px; color:#cdd9e8; }
+  input[type=range]{ flex:1; accent-color:#36c; }
+  .val { width: 86px; text-align:right; font-variant-numeric:tabular-nums;
+         font-size:13px; color:#ffd479; }
+  .btns { display:flex; gap:10px; margin-top:6px; }
+  button {
+    flex:1; padding:11px; font-size:14px; font-weight:600; cursor:pointer;
+    border:none; border-radius:8px; color:#fff; transition:.15s;
+  }
+  .start { background:#1f9d55; } .start:hover{ background:#25b863; }
+  .stop  { background:#c0392b; } .stop:hover { background:#e04a3a; }
+  .start:disabled,.stop:disabled{ opacity:.4; cursor:not-allowed; }
+  .gauges { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px; }
+  .gauge {
+    background:#1a2230; border:1px solid #33425c; border-radius:8px;
+    padding:10px; text-align:center;
+  }
+  .gauge .lab { font-size:11px; color:#8fa3bf; text-transform:uppercase; }
+  .gauge .num { font-size:23px; font-weight:700; color:#5ad; margin-top:3px;
+                font-variant-numeric:tabular-nums; }
+  .gauge .unit{ font-size:11px; color:#7d8ca3; }
+  .led { display:inline-block; width:11px; height:11px; border-radius:50%;
+         background:#555; margin-right:6px; vertical-align:middle; }
+  .led.on { background:#39e06b; box-shadow:0 0 8px #39e06b; }
+  .led.warn{ background:#e0b13a; box-shadow:0 0 8px #e0b13a; }
+  .led.err { background:#e04a3a; box-shadow:0 0 8px #e04a3a; }
+  .status { font-size:13px; margin-top:10px; padding:8px 10px;
+            background:#1a2230; border-radius:7px; border-left:4px solid #1f9d55; }
+  .alarm { border-left-color:#e0b13a; color:#ffd479; }
+  .footnote { font-size:11px; color:#6f7e95; margin-top:10px; line-height:1.5; }
+  .barwrap{ background:#1a2230; border-radius:6px; height:14px; overflow:hidden;
+            border:1px solid #33425c; margin-top:4px;}
+  .bar{ height:100%; width:0%; background:linear-gradient(90deg,#1f9d55,#e0b13a,#e04a3a);
+        transition:width .15s; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <h1>HT-250 &mdash; Tokarlik stanogi · Operator paneli (HMI)</h1>
+      <div class="sub">Metallni kesish jarayonini avtomatlashtirish · ChPU simulyatori</div>
+    </div>
+    <div style="text-align:right">
+      <div class="clock" id="clock">--:--:--</div>
+      <div class="sub"><span class="led" id="powerLed"></span><span id="modeTxt">TAYYOR</span></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- CHAP: animatsiya -->
+    <div class="panel">
+      <h2>Kesish zonasi · jonli animatsiya</h2>
+      <svg viewBox="0 0 640 360" id="scene">
+        <!-- stanina -->
+        <rect x="0" y="300" width="640" height="60" fill="#2a3344"/>
+        <rect x="0" y="296" width="640" height="6" fill="#3a4a66"/>
+        <!-- patron (chuck) -->
+        <g id="chuckGroup">
+          <circle cx="120" cy="190" r="70" fill="#3b4860" stroke="#566"
+                  stroke-width="3"/>
+          <circle cx="120" cy="190" r="58" fill="#2f3a4e"/>
+          <g id="chuckSpin">
+            <rect x="112" y="120" width="16" height="140" rx="3" fill="#6b7790"/>
+            <rect x="50" y="182" width="140" height="16" rx="3" fill="#6b7790"/>
+            <circle cx="120" cy="190" r="10" fill="#8b97b0"/>
+            <rect x="150" y="184" width="22" height="12" fill="#9aa" rx="2"/>
+            <rect x="68"  y="184" width="22" height="12" fill="#9aa" rx="2"/>
+          </g>
+        </g>
+        <!-- zagotovka (workpiece) -->
+        <rect id="workpiece" x="190" y="172" width="330" height="36" rx="3"
+              fill="url(#metal)"/>
+        <defs>
+          <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0"  stop-color="#9fb0c4"/>
+            <stop offset=".5" stop-color="#dfe8f2"/>
+            <stop offset="1"  stop-color="#7d8ca3"/>
+          </linearGradient>
+        </defs>
+        <!-- markaz (tailstock) -->
+        <polygon points="520,190 560,176 560,204" fill="#6b7790"/>
+        <rect x="560" y="168" width="40" height="44" rx="3" fill="#3b4860"
+              stroke="#566" stroke-width="2"/>
+        <!-- keskich (tool) -->
+        <g id="toolGroup">
+          <rect x="300" y="232" width="20" height="70" fill="#445" />
+          <polygon id="toolTip" points="300,232 320,232 312,214"
+                   fill="#d6a23a" stroke="#b5841f" stroke-width="1.5"/>
+        </g>
+        <!-- qirindi (chips) -->
+        <g id="chips"></g>
+        <!-- sovutish suyuqligi -->
+        <g id="coolant" style="display:none">
+          <line x1="310" y1="150" x2="310" y2="210" stroke="#4ad" stroke-width="3"
+                opacity=".6"/>
+        </g>
+        <text x="120" y="285" text-anchor="middle" fill="#7d8ca3"
+              font-size="12">Shpindel</text>
+        <text x="355" y="338" text-anchor="middle" fill="#7d8ca3"
+              font-size="12">Suport / keskich surilishi</text>
+      </svg>
+
+      <!-- kesish kuchi grafigi -->
+      <h2 style="margin-top:14px">Kesish kuchi Pz(t) · real vaqt</h2>
+      <svg viewBox="0 0 640 150" id="chart">
+        <rect x="0" y="0" width="640" height="150" fill="#11161f"/>
+        <line x1="40" y1="10" x2="40" y2="130" stroke="#445" stroke-width="1"/>
+        <line x1="40" y1="130" x2="630" y2="130" stroke="#445" stroke-width="1"/>
+        <text x="6" y="20" fill="#7d8ca3" font-size="10">N</text>
+        <text x="600" y="145" fill="#7d8ca3" font-size="10">t</text>
+        <polyline id="trace" fill="none" stroke="#5ad" stroke-width="2"
+                  points=""/>
+        <line id="setpoint" x1="40" y1="80" x2="630" y2="80" stroke="#e0b13a"
+              stroke-width="1" stroke-dasharray="5,4"/>
+      </svg>
+    </div>
+
+    <!-- O'NG: boshqaruv + ko'rsatkichlar -->
+    <div class="panel">
+      <h2>Rejim parametrlari</h2>
+      <div class="ctrl-row">
+        <label>Surilish S (mm/ayl)</label>
+        <input type="range" id="sFeed" min="0.05" max="0.6" step="0.01" value="0.30">
+        <span class="val" id="sFeedV">0.30</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Kesish chuqurligi t (mm)</label>
+        <input type="range" id="depth" min="0.5" max="4" step="0.1" value="2.0">
+        <span class="val" id="depthV">2.0</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Shpindel n (ayl/min)</label>
+        <input type="range" id="rpm" min="100" max="2000" step="10" value="1000">
+        <span class="val" id="rpmV">1000</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Zagotovka &Oslash; (mm)</label>
+        <input type="range" id="dia" min="20" max="120" step="1" value="60">
+        <span class="val" id="diaV">60</span>
+      </div>
+      <div class="ctrl-row">
+        <label>Sovutish (SOJ)</label>
+        <input type="checkbox" id="cool" checked style="transform:scale(1.4)">
+      </div>
+      <div class="btns">
+        <button class="start" id="startBtn">&#9654; START</button>
+        <button class="stop"  id="stopBtn" disabled>&#9632; STOP</button>
+      </div>
+
+      <h2 style="margin-top:16px">Jonli ko'rsatkichlar</h2>
+      <div class="gauges">
+        <div class="gauge"><div class="lab">Kesish tezligi V</div>
+          <div class="num" id="gV">0</div><div class="unit">m/min</div></div>
+        <div class="gauge"><div class="lab">Kesish kuchi Pz</div>
+          <div class="num" id="gPz">0</div><div class="unit">N</div></div>
+        <div class="gauge"><div class="lab">Quvvat Ne</div>
+          <div class="num" id="gNe">0</div><div class="unit">kVt</div></div>
+        <div class="gauge"><div class="lab">Buramomant Mkr</div>
+          <div class="num" id="gM">0</div><div class="unit">N·m</div></div>
+      </div>
+
+      <h2 style="margin-top:14px">Shpindel quvvatidan foydalanish</h2>
+      <div class="barwrap"><div class="bar" id="loadBar"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;
+                  color:#7d8ca3;margin-top:3px">
+        <span>0</span><span id="loadTxt">0%</span><span>Nshp = 6,0 kVt</span>
+      </div>
+
+      <div class="status" id="status">
+        <span class="led" id="runLed"></span>Tizim tayyor. START tugmasini bosing.
+      </div>
+      <div class="footnote">
+        Hisob 2.1-bo'lim formulalari asosida: V=&pi;Dn/1000;
+        Pz=10&middot;Cp&middot;t&middot;S<sup>0.75</sup>&middot;V<sup>-0.15</sup>;
+        Ne=Pz&middot;V/(60&middot;1000); Mkr=Pz&middot;D/2000.
+        Quvvat Nshp=Ndv&middot;&eta;=7,5&middot;0,8=6,0 kVt oshganda ogohlantirish beriladi.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  // --- holat ---
+  var running = false, angle = 0, toolX = 320, feedDir = 1;
+  var Cp = 300, Kp = 1.0;           // 2.1 koeffitsiyentlari
+  var Nshp = 6.0;                   // kVt
+  var trace = [], maxPts = 110;
+  var PzFilt = 0;                   // 1-tartibli filtr (dinamika imitatsiyasi)
+
+  // --- slayder qiymatlarini ko'rsatish ---
+  var ids = ['sFeed','depth','rpm','dia'];
+  ids.forEach(function(k){
+    $(k).addEventListener('input', function(){
+      var v = $(k).value;
+      $(k+'V').textContent = (k==='rpm'||k==='dia') ? v : (+v).toFixed(2);
+      compute(false);
+    });
+  });
+  $('cool').addEventListener('change', function(){
+    $('coolant').style.display = $('cool').checked ? 'block':'none';
+  });
+  $('coolant').style.display = $('cool').checked ? 'block':'none';
+
+  // --- hisob (2.1 formulalari) ---
+  function physics(){
+    var S = +$('sFeed').value, t = +$('depth').value,
+        n = +$('rpm').value,  D = +$('dia').value;
+    var V = Math.PI * D * n / 1000;                       // m/min
+    var Pz = 10*Cp*t*Math.pow(S,0.75)*Math.pow(Math.max(V,1),-0.15)*Kp; // N
+    var Ne = Pz*V/(60*1000);                              // kVt
+    var Mkr = Pz*D/2000;                                  // N·m
+    return {S:S,t:t,n:n,D:D,V:V,Pz:Pz,Ne:Ne,Mkr:Mkr};
+  }
+
+  function compute(live){
+    var p = physics();
+    $('gV').textContent  = p.V.toFixed(0);
+    $('gPz').textContent = p.Pz.toFixed(0);
+    $('gNe').textContent = p.Ne.toFixed(2);
+    $('gM').textContent  = p.Mkr.toFixed(1);
+    var load = p.Ne / Nshp * 100;
+    $('loadBar').style.width = Math.min(load,100)+'%';
+    $('loadTxt').textContent = load.toFixed(0)+'%';
+    // setpoint chizig'i (grafikda Pz mas-shtabi: 0..2500 N -> 130..10 px)
+    var sy = 130 - Math.min(p.Pz,2500)/2500*120;
+    $('setpoint').setAttribute('y1', sy);
+    $('setpoint').setAttribute('y2', sy);
+    // ogohlantirish
+    var st = $('status'), led = $('runLed');
+    if (load > 100){
+      st.className = 'status alarm';
+      st.innerHTML = '<span class="led err"></span>OGOHLANTIRISH: shpindel quvvati oshib ketdi ('
+        + load.toFixed(0) + '%). Surilish yoki chuqurlikni kamaytiring!';
+      led.className = 'led err';
+    } else if (load > 80){
+      st.className = 'status alarm';
+      st.innerHTML = '<span class="led warn"></span>Diqqat: quvvatdan foydalanish yuqori ('
+        + load.toFixed(0) + '%).';
+    } else if (running){
+      st.className = 'status';
+      st.innerHTML = '<span class="led on"></span>Kesish jarayoni bajarilmoqda · V='
+        + p.V.toFixed(0) + ' m/min · Pz=' + p.Pz.toFixed(0) + ' N';
+    } else {
+      st.className = 'status';
+      st.innerHTML = '<span class="led"></span>Tizim tayyor. START tugmasini bosing.';
+    }
+    return p;
+  }
+
+  // --- qirindi yaratish ---
+  function spawnChip(){
+    var g = $('chips');
+    if (g.childNodes.length > 18) g.removeChild(g.firstChild);
+    var c = document.createElementNS('http://www.w3.org/2000/svg','path');
+    var x = toolX, y = 218;
+    c.setAttribute('d','M'+x+','+y+' q -6,-10 -14,-8 q 8,4 6,12');
+    c.setAttribute('fill','none');
+    c.setAttribute('stroke','#d6a23a');
+    c.setAttribute('stroke-width','2');
+    c.setAttribute('opacity','0.9');
+    c._life = 1; c._x = x; c._y = y;
+    g.appendChild(c);
+  }
+  function ageChips(){
+    var g = $('chips'), kids = [].slice.call(g.childNodes);
+    kids.forEach(function(c){
+      c._life -= 0.04; c._x -= 3; c._y += 4;
+      if (c._life <= 0){ g.removeChild(c); return; }
+      c.setAttribute('transform','translate('+(c._x-c.__bx||0)+',0)');
+      c.setAttribute('opacity', c._life.toFixed(2));
+    });
+  }
+
+  // --- animatsiya halqasi ---
+  var last = 0;
+  function loop(ts){
+    if (!running){ return; }
+    var p = compute(true);
+    // shpindel aylanishi (n ga proporsional)
+    angle += p.n * 0.0006 * 16;
+    $('chuckSpin').setAttribute('transform',
+      'rotate('+angle+' 120 190)');
+    // keskich surilishi (S ga proporsional) — chap-o'ng patrul
+    toolX += feedDir * (0.4 + p.S*2.2);
+    if (toolX > 500){ toolX = 500; feedDir = -1; }
+    if (toolX < 210){ toolX = 210; feedDir = 1; }
+    $('toolGroup').setAttribute('transform','translate('+(toolX-320)+',0)');
+    // qirindi
+    if (Math.random() < 0.5) spawnChip();
+    ageChips();
+    // dinamik Pz (1-tartibli filtr + shovqin) -> grafik
+    var noise = (Math.random()-0.5) * p.Pz * 0.05;
+    PzFilt += ( (p.Pz+noise) - PzFilt ) * 0.15;
+    trace.push(PzFilt);
+    if (trace.length > maxPts) trace.shift();
+    drawTrace();
+    requestAnimationFrame(loop);
+  }
+  function drawTrace(){
+    var pts = trace.map(function(v,i){
+      var x = 40 + i*(590/maxPts);
+      var y = 130 - Math.min(v,2500)/2500*120;
+      return x.toFixed(1)+','+y.toFixed(1);
+    }).join(' ');
+    $('trace').setAttribute('points', pts);
+  }
+
+  // --- tugmalar ---
+  $('startBtn').addEventListener('click', function(){
+    running = true;
+    $('startBtn').disabled = true; $('stopBtn').disabled = false;
+    $('powerLed').className = 'led on'; $('modeTxt').textContent = 'ISHLAMOQDA';
+    requestAnimationFrame(loop);
+  });
+  $('stopBtn').addEventListener('click', function(){
+    running = false;
+    $('startBtn').disabled = false; $('stopBtn').disabled = true;
+    $('powerLed').className = 'led'; $('modeTxt').textContent = 'TO\u02bbXTADI';
+    compute(false);
+  });
+
+  // --- soat ---
+  setInterval(function(){
+    var d = new Date();
+    $('clock').textContent = d.toLocaleTimeString('uz-UZ');
+  }, 1000);
+
+  // boshlang'ich
+  ids.forEach(function(k){
+    var v=$(k).value; $(k+'V').textContent=(k==='rpm'||k==='dia')?v:(+v).toFixed(2);
+  });
+  compute(false);
+})();
+</script>
+</body>
+</html>
