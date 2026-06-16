@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>АСУ ТП — Мельница МШЦ | ГМЗ-7</title>
+<style>
+  :root{
+    --bg:#0b1118;
+    --panel:#121c27;
+    --panel2:#16222f;
+    --line:#243444;
+    --txt:#d7e3ee;
+    --muted:#7d93a6;
+    --accent:#28c0ff;
+    --green:#2bd576;
+    --red:#ff4d5e;
+    --amber:#ffb031;
+    --pipe:#3a5066;
+    --water:#2aa9e0;
+    --slurry:#b07a3a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--txt);
+    font-size:14px;
+    height:100vh;
+    overflow:hidden;
+  }
+  /* ---------- HEADER ---------- */
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    background:linear-gradient(90deg,#0e1822,#132333);
+    border-bottom:2px solid var(--accent);
+    padding:8px 18px;
+    height:60px;
+  }
+  .logo{display:flex;align-items:center;gap:14px;}
+  .logo .mark{
+    width:38px;height:38px;border-radius:8px;
+    background:radial-gradient(circle at 30% 30%,#39d0ff,#1769a8);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:800;color:#04121d;font-size:16px;
+    box-shadow:0 0 12px rgba(40,192,255,.5);
+  }
+  .logo h1{font-size:16px;font-weight:700;letter-spacing:.3px;}
+  .logo span{font-size:11px;color:var(--muted);font-weight:400;}
+  .head-right{display:flex;align-items:center;gap:22px;}
+  .clock{text-align:right;}
+  .clock .t{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .clock .d{font-size:11px;color:var(--muted);}
+  .opmode{
+    padding:6px 14px;border-radius:6px;font-weight:700;font-size:12px;
+    border:1px solid var(--line);background:#0d1620;
+  }
+  /* ---------- LAYOUT ---------- */
+  .wrap{
+    display:grid;
+    grid-template-columns: 1fr 320px;
+    grid-template-rows: 1fr 190px;
+    gap:10px;padding:10px;height:calc(100vh - 60px);
+  }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:12px;
+    position:relative;
+    overflow:hidden;
+  }
+  .panel h2{
+    font-size:12px;text-transform:uppercase;letter-spacing:1px;
+    color:var(--muted);margin-bottom:10px;font-weight:600;
+    border-bottom:1px solid var(--line);padding-bottom:6px;
+  }
+  /* ---------- MIMIC (scheme) ---------- */
+  .mimic{grid-row:1;grid-column:1;}
+  .scene{width:100%;height:calc(100% - 26px);}
+
+  /* mill rotation */
+  @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  .rotor{transform-origin:center;}
+  .rotor.run{animation:spin 2.4s linear infinite;}
+
+  /* flow dashes */
+  @keyframes flow{to{stroke-dashoffset:-28;}}
+  .flow{stroke-dasharray:10 8;animation:flow .7s linear infinite;}
+  .flow.off{animation:none;stroke:#2a3b4c;}
+
+  /* ---------- RIGHT: gauges ---------- */
+  .gauges{grid-row:1;grid-column:2;overflow-y:auto;}
+  .gauge{margin-bottom:14px;}
+  .gauge .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+  .gauge .name{font-size:12px;color:var(--txt);}
+  .gauge .val{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .gauge .val small{font-size:11px;color:var(--muted);font-weight:400;}
+  .bar{height:9px;border-radius:5px;background:#0c151e;overflow:hidden;position:relative;border:1px solid var(--line);}
+  .bar > i{display:block;height:100%;border-radius:5px;transition:width .5s ease, background .3s;}
+  /* ---------- BOTTOM-LEFT: KPIs + controls ---------- */
+  .control{grid-row:2;grid-column:1;display:flex;flex-direction:column;}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;flex:1;}
+  .kpi{
+    background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+    padding:8px 10px;display:flex;flex-direction:column;justify-content:center;
+  }
+  .kpi .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .kpi .v{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px;}
+  .kpi .v small{font-size:12px;color:var(--muted);font-weight:500;}
+  .btns{display:flex;gap:10px;margin-top:10px;}
+  button{
+    flex:1;padding:11px;border:none;border-radius:8px;font-size:14px;font-weight:700;
+    cursor:pointer;letter-spacing:.5px;transition:.15s;color:#06121c;
+  }
+  .b-start{background:linear-gradient(180deg,#36e08a,#1eaf64);}
+  .b-stop{background:linear-gradient(180deg,#ff6470,#d62a3b);color:#fff;}
+  .b-mode{background:linear-gradient(180deg,#3fb6ff,#1d7fc0);color:#04121d;}
+  button:hover{filter:brightness(1.12);}
+  button:active{transform:translateY(1px);}
+  button:disabled{opacity:.4;cursor:not-allowed;filter:none;}
+  /* ---------- BOTTOM-RIGHT: alarms ---------- */
+  .alarms{grid-row:2;grid-column:2;display:flex;flex-direction:column;}
+  .alog{flex:1;overflow-y:auto;font-size:12px;font-family:Consolas,monospace;}
+  .alog .a{display:flex;gap:8px;padding:4px 2px;border-bottom:1px solid #1a2734;}
+  .alog .a .ts{color:var(--muted);white-space:nowrap;}
+  .alog .a.warn .msg{color:var(--amber);}
+  .alog .a.crit .msg{color:var(--red);}
+  .alog .a.ok .msg{color:var(--green);}
+  /* status pill */
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+    padding:4px 10px;border-radius:20px;border:1px solid var(--line);}
+  .dot{width:9px;height:9px;border-radius:50%;}
+  .blink{animation:bl 1s steps(2) infinite;}
+  @keyframes bl{50%{opacity:.25;}}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#243444;border-radius:4px;}
+  text{font-family:"Segoe UI",Arial,sans-serif;}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="mark">МШ</div>
+    <div>
+      <h1>АСУ ТП — Шаровая мельница МШЦ-3600×5500</h1>
+      <span>ГМЗ-7 · Узел измельчения · Линия №1</span>
+    </div>
+  </div>
+  <div class="head-right">
+    <span class="pill"><span class="dot" id="hdrDot" style="background:var(--red)"></span><span id="hdrState">ОСТАНОВЛЕНА</span></span>
+    <div class="opmode" id="opMode">Режим: <b style="color:var(--accent)">АВТО</b></div>
+    <div class="clock">
+      <div class="t" id="clk">--:--:--</div>
+      <div class="d" id="dat">--</div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- ============ MIMIC SCHEME ============ -->
+  <section class="panel mimic">
+    <h2>Мнемосхема процесса измельчения</h2>
+    <svg class="scene" viewBox="0 0 900 470" preserveAspectRatio="xMidYMid meet">
+      <!-- ore bunker -->
+      <g>
+        <path d="M40 40 H150 L130 110 H60 Z" fill="#1c2b3a" stroke="#3a5066" stroke-width="2"/>
+        <rect x="55" y="35" width="80" height="12" fill="#26384a"/>
+        <text x="95" y="78" fill="#9fb3c4" font-size="12" text-anchor="middle">БУНКЕР</text>
+        <text x="95" y="94" fill="#9fb3c4" font-size="12" text-anchor="middle">РУДЫ</text>
+      </g>
+      <!-- feeder + conveyor -->
+      <rect x="95" y="118" width="220" height="14" rx="3" fill="#22323f" stroke="#3a5066"/>
+      <line class="flow" id="oreFlow" x1="110" y1="125" x2="305" y2="125" stroke="#cf9a52" stroke-width="6"/>
+      <text x="200" y="150" fill="#9fb3c4" font-size="11" text-anchor="middle">Питатель руды</text>
+
+      <!-- water -->
+      <g>
+        <rect x="40" y="200" width="70" height="60" rx="6" fill="#10303f" stroke="#2aa9e0"/>
+        <text x="75" y="234" fill="#69c6ec" font-size="11" text-anchor="middle">ВОДА</text>
+        <line class="flow" id="waterFlow" x1="110" y1="230" x2="305" y2="230" stroke="var(--water)" stroke-width="6"/>
+      </g>
+
+      <!-- MILL -->
+      <g transform="translate(310,150)">
+        <!-- supports -->
+        <rect x="20" y="150" width="40" height="40" fill="#26384a"/>
+        <rect x="260" y="150" width="40" height="40" fill="#26384a"/>
+        <!-- shell -->
+        <rect x="10" y="40" width="300" height="120" rx="60" fill="#2c3e4f" stroke="#6f8aa1" stroke-width="3"/>
+        <ellipse cx="10" cy="100" rx="22" ry="60" fill="#34495c" stroke="#6f8aa1" stroke-width="2"/>
+        <ellipse cx="310" cy="100" rx="22" ry="60" fill="#34495c" stroke="#6f8aa1" stroke-width="2"/>
+        <!-- rotating internals -->
+        <g class="rotor" id="rotor" transform="translate(160,100)">
+          <circle r="48" fill="none" stroke="#46627a" stroke-width="6" stroke-dasharray="14 10"/>
+          <circle r="30" fill="none" stroke="#3a566c" stroke-width="5" stroke-dasharray="10 8"/>
+          <circle cx="0" cy="-40" r="7" fill="#90a6ba"/>
+          <circle cx="35" cy="20" r="7" fill="#90a6ba"/>
+          <circle cx="-35" cy="20" r="7" fill="#90a6ba"/>
+          <circle cx="20" cy="-30" r="5" fill="#aebfce"/>
+          <circle cx="-25" cy="-15" r="5" fill="#aebfce"/>
+        </g>
+        <text x="160" y="180" fill="#cfe0ee" font-size="13" text-anchor="middle" font-weight="700">МЕЛЬНИЦА МШЦ</text>
+        <!-- drive motor -->
+        <rect x="120" y="195" width="80" height="34" rx="5" fill="#1c2b3a" stroke="#3a5066"/>
+        <text x="160" y="217" fill="#9fb3c4" font-size="11" text-anchor="middle">М · 4000 кВт</text>
+      </g>
+
+      <!-- discharge to sump -->
+      <line class="flow" id="dischFlow" x1="620" y1="250" x2="700" y2="250" stroke="var(--slurry)" stroke-width="7"/>
+      <line class="flow" id="dischFlow2" x1="700" y1="250" x2="700" y2="330" stroke="var(--slurry)" stroke-width="7"/>
+
+      <!-- pump + sump -->
+      <g>
+        <rect x="655" y="330" width="120" height="55" rx="6" fill="#1c2b3a" stroke="#3a5066"/>
+        <text x="715" y="362" fill="#9fb3c4" font-size="11" text-anchor="middle">ЗУМПФ</text>
+        <circle cx="715" cy="410" r="22" fill="#15293a" stroke="#3a5066" stroke-width="2"/>
+        <path class="rotor" id="pumpRotor" d="M715 392 L723 410 L715 428 L707 410 Z M697 410 L715 402 L733 410 L715 418 Z" fill="#7d9bb3" transform="translate(0,0)"/>
+        <text x="715" y="455" fill="#9fb3c4" font-size="11" text-anchor="middle">Насос ГРАТ</text>
+        <line class="flow" id="pumpFlow" x1="737" y1="410" x2="820" y2="410" stroke="var(--slurry)" stroke-width="6"/>
+      </g>
+
+      <!-- hydrocyclone -->
+      <g transform="translate(820,150)">
+        <path d="M0 0 H60 L40 120 L20 120 Z" fill="#1c2b3a" stroke="#3a5066" stroke-width="2"/>
+        <rect x="22" y="120" width="16" height="120" fill="#1c2b3a" stroke="#3a5066"/>
+        <text x="30" y="-10" fill="#9fb3c4" font-size="11" text-anchor="middle">ГЦ</text>
+        <line class="flow" id="ovfFlow" x1="30" y1="0" x2="30" y2="-40" stroke="#2bd576" stroke-width="6"/>
+        <text x="60" y="-30" fill="#7be0a5" font-size="10">Слив (готовый)</text>
+      </g>
+
+      <!-- inline mini readouts -->
+      <g font-family="Consolas,monospace">
+        <rect x="370" y="20" width="180" height="22" rx="4" fill="#0c1722" stroke="#243444"/>
+        <text x="378" y="35" fill="#7d93a6" font-size="11">n =</text>
+        <text x="402" y="35" id="svgRpm" fill="#28c0ff" font-size="11" font-weight="700">0.0 об/мин</text>
+
+        <rect x="560" y="20" width="170" height="22" rx="4" fill="#0c1722" stroke="#243444"/>
+        <text x="568" y="35" fill="#7d93a6" font-size="11">I =</text>
+        <text x="590" y="35" id="svgAmp" fill="#28c0ff" font-size="11" font-weight="700">0 A</text>
+      </g>
+    </svg>
+  </section>
+
+  <!-- ============ GAUGES ============ -->
+  <section class="panel gauges">
+    <h2>Контролируемые параметры</h2>
+    <div id="gaugeBox"></div>
+  </section>
+
+  <!-- ============ CONTROL / KPI ============ -->
+  <section class="panel control">
+    <h2>Ключевые показатели · Управление</h2>
+    <div class="kpis">
+      <div class="kpi"><div class="k">Произв-ть</div><div class="v"><span id="kProd">0</span><small> т/ч</small></div></div>
+      <div class="kpi"><div class="k">Мощность</div><div class="v"><span id="kPow">0</span><small> кВт</small></div></div>
+      <div class="kpi"><div class="k">Расход воды</div><div class="v"><span id="kWat">0</span><small> м³/ч</small></div></div>
+      <div class="kpi"><div class="k">Плотность</div><div class="v"><span id="kDen">0</span><small> кг/л</small></div></div>
+      <div class="kpi"><div class="k">Заполнение</div><div class="v"><span id="kFill">0</span><small> %</small></div></div>
+    </div>
+    <div class="btns">
+      <button class="b-start" id="btnStart">▶ ПУСК</button>
+      <button class="b-stop" id="btnStop" disabled>■ СТОП</button>
+      <button class="b-mode" id="btnMode">⇄ РЕЖИМ (АВТО)</button>
+    </div>
+  </section>
+
+  <!-- ============ ALARMS ============ -->
+  <section class="panel alarms">
+    <h2>Журнал событий и аварий</h2>
+    <div class="alog" id="alog"></div>
+  </section>
+</div>
+
+<script>
+/* ============================================================
+   АСУ ТП Мельница МШЦ — модель процесса + HMI логика
+   ============================================================ */
+
+// --- описание параметров с уставками ---
+const PARAMS = [
+  {id:'amp',  name:'Ток двигателя',          unit:'A',     min:0, max:380, lo:140, hi:340, set:0},
+  {id:'rpm',  name:'Обороты барабана',        unit:'об/мин',min:0, max:18,  lo:12,  hi:17,  set:0},
+  {id:'tin',  name:'Темп. подшипника (вх.)',  unit:'°C',    min:0, max:90,  lo:0,   hi:65,  set:0},
+  {id:'tout', name:'Темп. подшипника (вых.)', unit:'°C',    min:0, max:90,  lo:0,   hi:65,  set:0},
+  {id:'vib',  name:'Вибрация корпуса',         unit:'мм/с',  min:0, max:12,  lo:0,   hi:7.5, set:0},
+  {id:'snd',  name:'Звуковая загрузка',        unit:'%',     min:0, max:100, lo:30,  hi:85,  set:0},
+  {id:'oil',  name:'Давление масла',           unit:'бар',   min:0, max:6,   lo:2.0, hi:5.5, set:0},
+  {id:'feed', name:'Подача руды',              unit:'т/ч',   min:0, max:260, lo:0,   hi:240, set:0},
+];
+
+let st = {running:false, mode:'AUTO', startTs:0};
+const v = {}; // текущие значения
+PARAMS.forEach(p=>v[p.id]=p.id==='tin'||p.id==='tout'?28:0);
+
+// --- построение шкал ---
+const gaugeBox = document.getElementById('gaugeBox');
+PARAMS.forEach(p=>{
+  const el = document.createElement('div');
+  el.className='gauge';
+  el.innerHTML=`
+    <div class="row">
+      <span class="name">${p.name}</span>
+      <span class="val"><span id="v_${p.id}">0</span> <small>${p.unit}</small></span>
+    </div>
+    <div class="bar"><i id="b_${p.id}"></i></div>`;
+  gaugeBox.appendChild(el);
+});
+
+// --- журнал ---
+const alog=document.getElementById('alog');
+function log(msg,type='ok'){
+  const d=new Date();
+  const ts=d.toLocaleTimeString('ru-RU');
+  const row=document.createElement('div');
+  row.className='a '+type;
+  row.innerHTML=`<span class="ts">${ts}</span><span class="msg">${msg}</span>`;
+  alog.prepend(row);
+  while(alog.children.length>120) alog.removeChild(alog.lastChild);
+}
+
+// --- часы ---
+function tick(){
+  const d=new Date();
+  document.getElementById('clk').textContent=d.toLocaleTimeString('ru-RU');
+  document.getElementById('dat').textContent=d.toLocaleDateString('ru-RU',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+setInterval(tick,1000); tick();
+
+// --- управление ---
+const btnStart=document.getElementById('btnStart');
+const btnStop=document.getElementById('btnStop');
+const btnMode=document.getElementById('btnMode');
+const rotor=document.getElementById('rotor');
+const pumpRotor=document.getElementById('pumpRotor');
+
+function setRunning(on){
+  st.running=on;
+  btnStart.disabled=on;
+  btnStop.disabled=!on;
+  document.getElementById('hdrState').textContent=on?'В РАБОТЕ':'ОСТАНОВЛЕНА';
+  document.getElementById('hdrDot').style.background=on?'var(--green)':'var(--red)';
+  document.getElementById('hdrDot').classList.toggle('blink',on);
+  rotor.classList.toggle('run',on);
+  pumpRotor.classList.toggle('run',on);
+  ['oreFlow','waterFlow','dischFlow','dischFlow2','pumpFlow','ovfFlow'].forEach(id=>{
+    document.getElementById(id).classList.toggle('off',!on);
+  });
+  if(on){ st.startTs=Date.now(); log('Команда ПУСК принята. Запуск маслосистемы → разгон привода.','ok'); }
+  else  { log('Команда СТОП. Останов привода, дренаж барабана.','warn'); }
+}
+btnStart.onclick=()=>{ if(!st.running){ log('Предпусковая блокировка пройдена. Маслонасос ВКЛ.','ok'); setRunning(true);} };
+btnStop.onclick=()=>{ if(st.running) setRunning(false); };
+btnMode.onclick=()=>{
+  st.mode = st.mode==='AUTO'?'РУЧНОЙ':'AUTO';
+  btnMode.textContent='⇄ РЕЖИМ ('+st.mode+')';
+  document.getElementById('opMode').innerHTML='Режим: <b style="color:var(--accent)">'+st.mode+'</b>';
+  log('Переключение режима управления: '+st.mode,'ok');
+};
+
+// --- цель (target) значений при работе ---
+function targets(){
+  if(!st.running) return {amp:0,rpm:0,tin:28,tout:28,vib:0,snd:0,oil:0,feed:0};
+  return {amp:300,rpm:15.6,tin:52,tout:55,vib:3.2,snd:62,oil:4.2,feed:215};
+}
+
+// --- лёгкий шум ---
+const rnd=(a)=> (Math.random()*2-1)*a;
+function approach(cur,tgt,rate){ return cur + (tgt-cur)*rate; }
+
+// --- сигнализация по уставкам ---
+const alarmState={};
+function checkAlarm(p,val){
+  let level='ok';
+  if(val>p.hi) level='crit';
+  else if(p.lo>0 && val<p.lo && st.running) level='warn';
+  if(alarmState[p.id]!==level){
+    alarmState[p.id]=level;
+    if(level==='crit') log(`⚠ АВАРИЯ: ${p.name} = ${val.toFixed(1)} ${p.unit} (выше ВУ ${p.hi})`,'crit');
+    else if(level==='warn') log(`Предупреждение: ${p.name} = ${val.toFixed(1)} ${p.unit} (ниже НУ ${p.lo})`,'warn');
+    else if(st.running) log(`Норма: ${p.name} в допустимых пределах`,'ok');
+  }
+  return level;
+}
+
+// --- основной цикл моделирования ---
+function loop(){
+  const tg=targets();
+  PARAMS.forEach(p=>{
+    const rate = st.running?0.08:0.05;
+    let target = tg[p.id] + (st.running?rnd(p.id==='tin'||p.id==='tout'?0.6:p.max*0.015):0);
+    v[p.id]=approach(v[p.id],target,rate);
+    if(v[p.id]<0.02) v[p.id]=0;
+    p.set=v[p.id];
+
+    const val=v[p.id];
+    const pct=Math.max(0,Math.min(100,(val-p.min)/(p.max-p.min)*100));
+    const bar=document.getElementById('b_'+p.id);
+    bar.style.width=pct+'%';
+    const lvl=checkAlarm(p,val);
+    bar.style.background = lvl==='crit'?'var(--red)':lvl==='warn'?'var(--amber)':
+                           pct>80?'linear-gradient(90deg,#28c0ff,#2bd576)':'var(--accent)';
+    document.getElementById('v_'+p.id).textContent = val.toFixed(p.id==='vib'||p.id==='oil'||p.id==='rpm'?1:0);
+  });
+
+  // KPI
+  const prod = st.running? v.feed*0.97 : 0;
+  document.getElementById('kProd').textContent=prod.toFixed(0);
+  document.getElementById('kPow').textContent=(v.amp*6).toFixed(0);
+  const water = st.running? 95+rnd(2) : 0;
+  document.getElementById('kWat').textContent=water.toFixed(0);
+  const den = st.running? 1.78+rnd(0.02):0;
+  document.getElementById('kDen').textContent=den.toFixed(2);
+  const fill = st.running? Math.min(45, v.snd*0.55):0;
+  document.getElementById('kFill').textContent=fill.toFixed(0);
+
+  // SVG inline
+  document.getElementById('svgRpm').textContent=v.rpm.toFixed(1)+' об/мин';
+  document.getElementById('svgAmp').textContent=v.amp.toFixed(0)+' A';
+
+  requestAnimationFrame(()=>setTimeout(loop,400));
+}
+loop();
+
+// стартовое сообщение
+log('Система АСУ ТП загружена. Мельница в режиме ожидания.','ok');
+log('Связь с ПЛК установлена. Опрос датчиков 400 мс.','ok');
+</script>
+</body>
+</html>
